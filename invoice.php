@@ -28,6 +28,7 @@ $button = $input["button"];
 $tg_token = "token";
 $tg_id = $input["chat_id"];
 $bitrix = $input["bitrix"];
+$contact_id = $input["contact_id"];
 $deal_id = $input["deal_id"];
 $ss_token = $input["token"];
 $out_data = $input["out_data"];
