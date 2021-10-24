@@ -1,0 +1,506 @@
+<?php
+
+//CheckOut.php by Mufik v0.1 for Smartsender
+
+
+//------------------
+
+ini_set('max_execution_time', '1700');
+set_time_limit(1700);
+
+
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST');
+header('Content-Type: json; charset=utf-8');
+
+http_response_code(200);
+
+//------------------
+
+$inputJSON = file_get_contents('php://input');
+$input = json_decode($inputJSON, TRUE); //convert JSON into array
+
+//------------------
+
+$userid = $input["userid"];
+$text = $input["text"];
+$button = $input["button"];
+$tg_token = "1937030288:AAG5Cq_j93VJ2xXsbn74A4Uiv1M-EQQOL6s";
+$tg_id = $input["chat_id"];
+$bitrix = $input["bitrix"];
+$deal_id = $input["deal_id"];
+$ss_token = $input["token"];
+$out_data = $input["out_data"];
+$count = $input["count"];
+$md5 = md5($ss_token);
+
+//------------------
+
+
+function str_split_unicode($str, $l = 0) {
+if ($l > 0) {
+    $ret = array();
+    $len = mb_strlen($str, "UTF-8");
+    for ($i = 0; $i < $len; $i += $l) {
+        $ret[] = mb_substr($str, $i, $l, "UTF-8");
+    }
+    return $ret;
+}
+return preg_split("//u", $str, -1, PREG_SPLIT_NO_EMPTY);
+}
+
+
+$link = 'https://webhook.site/6e336d15-f273-4e70-b8a3-2f86d8027afd';
+
+function send_forward($inputJSON, $link){
+	
+$request = 'POST';	
+		
+$descriptor = curl_init($link);
+
+ curl_setopt($descriptor, CURLOPT_POSTFIELDS, $inputJSON);
+ curl_setopt($descriptor, CURLOPT_RETURNTRANSFER, 1);
+ curl_setopt($descriptor, CURLOPT_HTTPHEADER, array('Content-Type: application/json')); 
+ curl_setopt($descriptor, CURLOPT_CUSTOMREQUEST, $request);
+
+    $itog = curl_exec($descriptor);
+    curl_close($descriptor);
+
+   		 return $itog;
+		
+}
+
+
+//send_forward($inputJSON, $link);
+
+//-----------------------
+
+// Проверка входящих данных
+if ($ss_token == NULL || $userid == NULL) {
+    $result["status"] = "error";
+    if ($ss_token == NULL) {
+        $result["message"][] = "Вы не указали токен SmartSender. Он нужен для получения информации.";
+    }
+    if ($userid == NULL) {
+        $result["message"][] = "Вы не указали идентификатор пользователя. Система не знает, чью информацию нужно использовать.";
+    }
+    echo json_encode($result);
+    exit;
+}
+
+// Получение данных из корзины
+if ($out_data == "checkout") {
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+      CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/checkout?page=1&limitation=20',
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_ENCODING => '',
+      CURLOPT_MAXREDIRS => 10,
+      CURLOPT_TIMEOUT => 0,
+      CURLOPT_FOLLOWLOCATION => true,
+      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+      CURLOPT_CUSTOMREQUEST => 'GET',
+      CURLOPT_HTTPHEADER => array(
+        'Authorization: Bearer '.$ss_token.''
+      ),
+    ));
+    $response = curl_exec($curl);
+    curl_close($curl);
+    $cursor = json_decode($response, true);
+    if ($cursor["error"] != NULL && $cursor["error"] != 'undefined') {
+        $result["status"] = "error";
+        $result["message"][] = "Ошибка получения данных из SmartSender";
+        if ($cursor["error"]["code"] == 404 || $cursor["error"]["code"] == 400) {
+            $result["message"][] = "Пользователь не найден. Проверте правильность идентификатора пользователя и приналежность токена к текущему проекту.";
+        } else if ($cursor["error"]["code"] == 403) {
+            $result["message"][] = "Токен проекта SmartSender указан неправильно. Проверте правильность токена.";
+        }
+        echo json_encode($result);
+        exit;
+    } else if (empty($cursor["collection"])) {
+        $result["status"] = "error";
+        $result["message"][] = "Корзина пользователя пустая. Для тестирования добавте товар в корзину.";
+        $result["message"][] = "Обратите внимание, что успешная оплата заказа очищает корзину.";
+        $result["message"][] = "После оплаты используйте 'out_data':'invoice' в теле запроса.";
+        echo json_encode($result);
+        exit;
+    }
+    $pages = $cursor["cursor"]["pages"];
+    for ($i = 1; $i <= $pages; $i++) {
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/checkout?page='.$i.'&limitation=20',
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'GET',
+          CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer '.$ss_token.''
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $checkout = json_decode ($response, true);
+    	$essences = $checkout["collection"];
+    	$currency = $essences[0]["currency"];
+    	foreach ($essences as $product) {
+    		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+    		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
+    		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
+    		$bx_tovar["PRODUCT_NAME"] = $product["product"]["name"].': '.$product["name"];
+    		$bx_tovar["PRICE"] = $product["amount"];
+    		$bx_tovar["QUANTITY"] = $product["pivot"]["quantity"];
+    		$bx[] = $bx_tovar;
+    	}
+    }
+    
+// Поиск почледнего оплаченого счета в истории контакта
+} else if ($out_data == "invoice") {
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+      CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/messages?page=1&limitation=20',
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_ENCODING => '',
+      CURLOPT_MAXREDIRS => 10,
+      CURLOPT_TIMEOUT => 0,
+      CURLOPT_FOLLOWLOCATION => true,
+      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+      CURLOPT_CUSTOMREQUEST => 'GET',
+      CURLOPT_HTTPHEADER => array(
+        'Authorization: Bearer '.$ss_token.''
+      ),
+    ));
+    $response = curl_exec($curl);
+    curl_close($curl);
+    $inform = json_decode($response, true);
+    if ($inform["error"] != NULL && $inform["error"] != 'undefined') {
+        $result["status"] = "error";
+        $result["message"][] = "Ошибка получения данных из SmartSender.";
+        if ($inform["error"]["code"] == 404 || $inform["error"]["code"] == 400) {
+            $result["message"][] = "Пользователь не найден. Проверте правильность идентификатора пользователя и приналежность токена к текущему проекту.";
+        } else if ($inform["error"]["code"] == 403) {
+            $result["message"][] = "Токен проекта SmartSender указан неправильно. Проверте правильность токена.";
+        }
+        echo json_encode($result);
+        exit;
+    } else if (empty($inform["collection"])) {
+        $result["status"] = "error";
+        $result["message"][] = "История пользователя вообще пустая.";
+        $result["message"][] = "Оплаченных счетов даже быть не может";
+        echo json_encode($result);
+        exit;
+    }
+    $total = $inform["total"];
+    $pages = $total/20+1;
+    for ($i = 1; $i <= $pages; $i++) {
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/messages?page='.$i.'&limitation=20',
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'GET',
+          CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer '.$ss_token.''
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $history = json_decode($response, true);
+        foreach($history["collection"] as $one_message) {
+            if (stripos($one_message["content"]["resource"]["parameters"]["content"], "successfully paid")) {
+                $orderId = $one_message["content"]["resource"]["parameters"]["replacement"][":orderId"];
+                break 2;
+            }
+        }
+    } 
+    // Получение данных счета
+    if ($orderId != NULL) {
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/invoices/'.$orderId,
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'GET',
+          CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer '.$ss_token.''
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $checkout = json_decode ($response, true);
+        if ($checkout["essence"] != NULL) {
+            $product = $checkout["essence"];
+            $message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+    		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
+    		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
+    		$bx_tovar["PRODUCT_NAME"] = $product["product"]["name"].': '.$product["name"];
+    		$bx_tovar["PRICE"] = $product["amount"];
+    		$bx_tovar["QUANTITY"] = $product["pivot"]["quantity"];
+    		$bx[] = $bx_tovar;
+        } else if ($checkout["essences"] != NULL) {
+        	$essences = $checkout["essences"];
+        	$currency = $essences[0]["currency"];
+        	foreach ($essences as $product) {
+        		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+        		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
+        		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
+        		$bx_tovar["PRODUCT_NAME"] = $product["product"]["name"].': '.$product["name"];
+    		    $bx_tovar["PRICE"] = $product["amount"];
+    		    $bx_tovar["QUANTITY"] = $product["pivot"]["quantity"];
+    		    $bx[] = $bx_tovar;
+        	}
+        } else {
+            $result["status"] = "error";
+            $result["message"][] = "Ошибка обработки счета. Сообщите информацию https://t.me/mufik";
+            $result["message"][] = "Также предоставте полное тело запроса и код ".$orderId;
+            echo json_decode($result);
+            exit;
+        }
+    } else {
+        $result["status"] = "error";
+        $result["message"][] = "У пользователя не найдено успешно оплаченных счетов";
+        echo json_encode($result);
+        exit;
+    }
+} else {
+    $result["status"] = "error";
+    $result["message"][] = "Вы не указали, откуда получать информацию.";
+    if ($out_data == NULL) {
+        $result["message"][] = "Добавте елемент out_data в тело запроса. Возможные значения: ";
+        $result["message"][] = "'checkout' - для получения информации из корзины,";
+        $result["message"][] = "'invoice' - для получения информации с оплаченого счета";
+    } else {
+        $result["message"][] = "Исправте елемент out_data в теле запроса. Возможные значения: ";
+        $result["message"][] = "'checkout' - для получения информации из корзины,";
+        $result["message"][] = "'invoice' - для получения информации с оплаченого счета";
+    }
+    echo json_encode($result);
+    exit;
+}
+
+// Получение счетчика
+if (file_exists('invoice_count.json') === true) {
+    $get_count =  file_get_contents('invoice_count.json');
+    $file_count = json_decode($get_count, true);
+}
+
+if ($file_count[$md5] == NULL) {
+    $file_count[$md5] = 1;
+} else {
+    $file_count[$md5]++;
+}
+if ($count == "restart") {
+    $file_count[$md5] = 1;
+} else if ($count > 1 && $count != NULL) {
+    $file_count[$md5] = $count;
+}
+$json_count = json_encode($file_count);
+file_put_contents('invoice_count.json', $json_count);
+
+if (is_array($summ)) {
+    $summ_itog = array_sum($summ);
+}
+$text_message = $message.'Общая сумма заказа: '.$summ_itog.' '.$currency.'\n------\n'.$text;
+$to_vars = str_split_unicode($message, 250);
+
+// Отправка уведомления в телеграмм
+if ($tg_id != NULL) {
+    if (is_array($button)) {
+        foreach ($button as $key => $url) {
+            $inline_key["text"] = $key;
+            if ($inline_key["url"] == "chats") {
+                
+            } else {
+                $inline_key["url"] = $url;
+            }
+            $inline_keyboard[][0] = $inline_key;
+        }
+        $inline = json_encode($inline_keyboard);
+
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'POST',
+          CURLOPT_POSTFIELDS =>'{
+            "chat_id":"'.$tg_id.'",
+            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'",
+            "reply_markup":{
+                "inline_keyboard": '.$inline.'
+            }
+        }',
+          CURLOPT_HTTPHEADER => array(
+            'Content-Type: application/json'
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+    } else {
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'POST',
+          CURLOPT_POSTFIELDS =>'{
+            "chat_id":"'.$tg_id.'",
+            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'",
+        }',
+          CURLOPT_HTTPHEADER => array(
+            'Content-Type: application/json'
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+    }
+    $tg_otvet = json_decode($response, true);
+    if (stripos($tg_otvet["description"], "chat not found")) {
+        $result["status"] = "error";
+        $result["message"][] = "Чат не найден. Проверте Id чата. Добавте @smartcustombot в чат"; 
+    } else if (stripos($tg_otvet["description"], "group chat was upgraded to a supergroup chat")) {
+        $new_tg_id = $tg_otvet["parameters"]["migrate_to_chat_id"];
+        $result["status"] = "migrate_chat";
+        $result["message"][] = "Чат был обновлен к уровню супергруппы";
+        $result["message"][] = "Новый Id чата: ".$new_tg_id;
+        $result["message"][] = "Мы отправили сообщение, но Id чата нужно изменить в запросе";
+    } else if ($tg_otvet["ok"] === false) {
+        $result["status"] = "error";
+        $result["message"][] = "Ошибка отправки сообщения. Ниже ответ от API Telegram";
+        $result["telegramAPI"] = $tg_otvet;
+    } else {
+        $result["message"][] = "Уведомление отправлено";
+    }
+}
+
+if ($result["status"] == "migrate_chat") {
+    if (is_array($button)) {
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'POST',
+          CURLOPT_POSTFIELDS =>'{
+            "chat_id":"'.$new_tg_id.'",
+            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id '.$new_tg_id.'",
+            "reply_markup":{
+                "inline_keyboard": '.$inline.'
+            }
+        }',
+          CURLOPT_HTTPHEADER => array(
+            'Content-Type: application/json'
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+    } else {
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+          CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
+          CURLOPT_RETURNTRANSFER => true,
+          CURLOPT_ENCODING => '',
+          CURLOPT_MAXREDIRS => 10,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_FOLLOWLOCATION => true,
+          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+          CURLOPT_CUSTOMREQUEST => 'POST',
+          CURLOPT_POSTFIELDS =>'{
+            "chat_id":"'.$new_tg_id.'",
+            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id '.$new_tg_id.'",
+        }',
+          CURLOPT_HTTPHEADER => array(
+            'Content-Type: application/json'
+          ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+    }
+}
+
+// Работаем с bitrix24
+if ($bitrix != NULL) {
+    if ($deal_id != NULL) {
+        $send_deal["id"] = $deal_id;
+    } else {
+        if ($contact_id != NULL) {
+            $create_deal["fields"]["CONTACT_ID"] = $contact_id;
+        } else {
+            // Получение данных о контакте и отправка в битрикс (создание)
+            $curl = curl_init();
+            curl_setopt_array($curl, array(
+              CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/info',
+              CURLOPT_RETURNTRANSFER => true,
+              CURLOPT_ENCODING => '',
+              CURLOPT_MAXREDIRS => 10,
+              CURLOPT_TIMEOUT => 0,
+              CURLOPT_FOLLOWLOCATION => true,
+              CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+              CURLOPT_CUSTOMREQUEST => 'GET',
+              CURLOPT_HTTPHEADER => array(
+                'Authorization: Bearer '.$ss_token.''
+              ),
+            ));
+            $response = curl_exec($curl);
+            curl_close($curl);
+            $user_data = json_decode($response, true);
+            $create_contact["fields"]["NAME"] = $user_data["firstName"];
+            $create_contact["fields"]["LAST_NAME"] = $user_data["lastName"];
+            $create_contact["fields"]["COMMENTS"] = "userId: ".$userid;
+            $create_contact["fields"]["UTM_SOURCE"] = $user_data["utm_source"];
+            $create_contact["fields"]["UTM_MEDIUM"] = $user_data["utm_medium"];
+            $create_contact["fields"]["UTM_CAMPAIGN"] = $user_data["utm_campaing"];
+            $create_contact["fields"]["UTM_CONTENT"] = $user_data["utm_content"];
+            $create_contact["fields"]["UTM_TERM"] = $user_data["utm_term"];
+            $create_contact["fields"]["PHONE"][0]["VALUE"] = $user_data["phone"];
+            $create_contact["fields"]["EMAIL"][0]["VALUE"] = $user_data["email"];
+            $json_create_contact = json_encode($create_contact);
+            $result_create_contact = send_forward($json_create_contact, $bitrix.'crm.contact.add.json');
+            $result_contact = json_decode($result_create_contact, true);
+            $create_deal["fields"]["CONTACT_ID"] = $result_contact["result"];
+        }
+        // Создание сделки для контакта в Битрикс
+        $result["bitrix"]["contact_id"] = $create_deal["fields"]["CONTACT_ID"];
+        $create_deal["fields"]["COMMENTS"] = $text.'<br/><br/>Заказ: '.$file_count[$md5];
+        $json_create_deal = json_encode($create_deal);
+        $result_create_deal = send_forward($json_create_deal, $bitrix.'crm.deal.add.json');
+        $result_deal = json_decode($result_create_deal, true);
+        $send_deal["id"] = $result_deal["result"];
+    }
+    // Добавление товаров в сделку битрикс
+    $send_deal["rows"] = $bx;
+    $result["bitrix"]["deal_id"] = $send_deal["id"];
+    $json_send_deal = json_encode($send_deal);
+    send_forward($json_send_deal, $bitrix.'crm.deal.productrows.set.json');
+}
+
+// Возвращение ответа
+$result["count"] = $file_count[$md5];
+$result["summ"] = $summ_itog;
+$result["currency"] = $currency;
+$result["tovar"] = $tovar;
+$result["to_vars"] = $to_vars;
+echo json_encode($result);
