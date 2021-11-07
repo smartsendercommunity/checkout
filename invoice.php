@@ -25,19 +25,18 @@ $input = json_decode($inputJSON, TRUE); //convert JSON into array
 $userid = $input["userid"];
 $text = $input["text"];
 $button = $input["button"];
-$tg_token = "token";         //  Токен бота указать в этой стоке вместо слова token внутри кавычек
+$tg_token = "token Телеграм-бота";
 $tg_id = $input["chat_id"];
 $bitrix = $input["bitrix"];
-$contact_id = $input["contact_id"];
 $deal_id = $input["deal_id"];
 $ss_token = $input["token"];
 $out_data = $input["out_data"];
 $count = $input["count"];
 $md5 = md5($ss_token);
+$api_url = "https://api.smartsender.com";
 
-//------------------
-
-
+// functions
+{
 function str_split_unicode($str, $l = 0) {
 if ($l > 0) {
     $ret = array();
@@ -49,10 +48,6 @@ if ($l > 0) {
 }
 return preg_split("//u", $str, -1, PREG_SPLIT_NO_EMPTY);
 }
-
-
-$link = 'https://webhook.site/6e336d15-f273-4e70-b8a3-2f86d8027afd';
-
 function send_forward($inputJSON, $link){
 	
 $request = 'POST';	
@@ -70,11 +65,23 @@ $descriptor = curl_init($link);
    		 return $itog;
 		
 }
+function send_bearer($url, $token, $type = "GET", $param = []){
+	
+		
+$descriptor = curl_init($url);
 
+ curl_setopt($descriptor, CURLOPT_POSTFIELDS, json_encode($param));
+ curl_setopt($descriptor, CURLOPT_RETURNTRANSFER, 1);
+ curl_setopt($descriptor, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'Authorization: Bearer '.$token)); 
+ curl_setopt($descriptor, CURLOPT_CUSTOMREQUEST, $type);
 
-//send_forward($inputJSON, $link);
+    $itog = curl_exec($descriptor);
+    curl_close($descriptor);
 
-//-----------------------
+   		 return $itog;
+		
+}
+}
 
 // Проверка входящих данных
 if ($ss_token == NULL || $userid == NULL) {
@@ -91,23 +98,7 @@ if ($ss_token == NULL || $userid == NULL) {
 
 // Получение данных из корзины
 if ($out_data == "checkout") {
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/checkout?page=1&limitation=20',
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => '',
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 0,
-      CURLOPT_FOLLOWLOCATION => true,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => 'GET',
-      CURLOPT_HTTPHEADER => array(
-        'Authorization: Bearer '.$ss_token.''
-      ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    $cursor = json_decode($response, true);
+    $cursor = json_decode(send_bearer($api_url."/v1/contacts/".$userid."/checkout?page=1&limitation=20", $ss_token), true);
     if ($cursor["error"] != NULL && $cursor["error"] != 'undefined') {
         $result["status"] = "error";
         $result["message"][] = "Ошибка получения данных из SmartSender";
@@ -128,23 +119,7 @@ if ($out_data == "checkout") {
     }
     $pages = $cursor["cursor"]["pages"];
     for ($i = 1; $i <= $pages; $i++) {
-        $curl = curl_init();
-        curl_setopt_array($curl, array(
-          CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/checkout?page='.$i.'&limitation=20',
-          CURLOPT_RETURNTRANSFER => true,
-          CURLOPT_ENCODING => '',
-          CURLOPT_MAXREDIRS => 10,
-          CURLOPT_TIMEOUT => 0,
-          CURLOPT_FOLLOWLOCATION => true,
-          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-          CURLOPT_CUSTOMREQUEST => 'GET',
-          CURLOPT_HTTPHEADER => array(
-            'Authorization: Bearer '.$ss_token.''
-          ),
-        ));
-        $response = curl_exec($curl);
-        curl_close($curl);
-        $checkout = json_decode ($response, true);
+        $checkout = json_decode (send_bearer($api_url."/v1/contacts/".$userid."/checkout?page=".$i."&limitation=20", $ss_token), true);
     	$essences = $checkout["collection"];
     	$currency = $essences[0]["currency"];
     	foreach ($essences as $product) {
@@ -158,88 +133,47 @@ if ($out_data == "checkout") {
     	}
     }
     
-// Поиск почледнего оплаченого счета в истории контакта
+// Поиск последнего оплаченого счета в истории контакта
 } else if ($out_data == "invoice") {
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/messages?page=1&limitation=20',
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => '',
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 0,
-      CURLOPT_FOLLOWLOCATION => true,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => 'GET',
-      CURLOPT_HTTPHEADER => array(
-        'Authorization: Bearer '.$ss_token.''
-      ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    $inform = json_decode($response, true);
-    if ($inform["error"] != NULL && $inform["error"] != 'undefined') {
+    $cursor = json_decode(send_bearer($api_url."/v1/contacts/".$userid."/invoices?page=1&limitation=20", $ss_token), true);
+    if ($cursor["error"] != NULL && $cursor["error"] != 'undefined') {
         $result["status"] = "error";
         $result["message"][] = "Ошибка получения данных из SmartSender.";
-        if ($inform["error"]["code"] == 404 || $inform["error"]["code"] == 400) {
+        if ($cursor["error"]["code"] == 404 || $inform["error"]["code"] == 400) {
             $result["message"][] = "Пользователь не найден. Проверте правильность идентификатора пользователя и приналежность токена к текущему проекту.";
-        } else if ($inform["error"]["code"] == 403) {
+        } else if ($cursor["error"]["code"] == 403) {
             $result["message"][] = "Токен проекта SmartSender указан неправильно. Проверте правильность токена.";
         }
         echo json_encode($result);
         exit;
-    } else if (empty($inform["collection"])) {
+    } else if (empty($cursor["collection"])) {
         $result["status"] = "error";
-        $result["message"][] = "История пользователя вообще пустая.";
-        $result["message"][] = "Оплаченных счетов даже быть не может";
+        $result["message"][] = "У пользователя нет счетов";
         echo json_encode($result);
         exit;
     }
-    $total = $inform["total"];
-    $pages = $total/20+1;
+    $pages = $cursor["cursor"]["pages"];
     for ($i = 1; $i <= $pages; $i++) {
-        $curl = curl_init();
-        curl_setopt_array($curl, array(
-          CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/messages?page='.$i.'&limitation=20',
-          CURLOPT_RETURNTRANSFER => true,
-          CURLOPT_ENCODING => '',
-          CURLOPT_MAXREDIRS => 10,
-          CURLOPT_TIMEOUT => 0,
-          CURLOPT_FOLLOWLOCATION => true,
-          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-          CURLOPT_CUSTOMREQUEST => 'GET',
-          CURLOPT_HTTPHEADER => array(
-            'Authorization: Bearer '.$ss_token.''
-          ),
-        ));
-        $response = curl_exec($curl);
-        curl_close($curl);
-        $history = json_decode($response, true);
-        foreach($history["collection"] as $one_message) {
-            if (stripos($one_message["content"]["resource"]["parameters"]["content"], "successfully paid")) {
-                $orderId = $one_message["content"]["resource"]["parameters"]["replacement"][":orderId"];
-                break 2;
+        $allInvoice = json_decode(send_bearer($api_url."/v1/contacts/".$userid."/invoices?page=".$i."&limitation=20", $ss_token), true);
+        if (is_array($allInvoice["collection"]) === true) {
+            foreach ($allInvoice["collection"] as $oneInvoice) {
+                if (is_array($oneInvoice["logs"]) === true) {
+                    foreach($oneInvoice["logs"] as $oneInvoiceLogs) {
+                        if ($oneInvoiceLogs["state"] == true) {
+                            $time = strtotime($oneInvoiceLogs["createdAt"]);
+                            $trueInvoice[$time] = $oneInvoice["orderId"];
+                        }
+                    }
+                }
             }
         }
-    } 
+    }
+    // Сортировка счетов по дате успешной оплаты
+    krsort($trueInvoice);
+    $orderId = current($trueInvoice);
     // Получение данных счета
-    if ($orderId != NULL) {
-        $curl = curl_init();
-        curl_setopt_array($curl, array(
-          CURLOPT_URL => 'https://api.smartsender.com/v1/contacts/'.$userid.'/invoices/'.$orderId,
-          CURLOPT_RETURNTRANSFER => true,
-          CURLOPT_ENCODING => '',
-          CURLOPT_MAXREDIRS => 10,
-          CURLOPT_TIMEOUT => 0,
-          CURLOPT_FOLLOWLOCATION => true,
-          CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-          CURLOPT_CUSTOMREQUEST => 'GET',
-          CURLOPT_HTTPHEADER => array(
-            'Authorization: Bearer '.$ss_token.''
-          ),
-        ));
-        $response = curl_exec($curl);
-        curl_close($curl);
-        $checkout = json_decode ($response, true);
+    if ($orderId != NULL && $orderId != false) {
+        $checkout = json_decode (send_bearer($api_url."/v1/contacts/".$userid."/invoices/".$orderId, $ss_token), true);
         if ($checkout["essence"] != NULL) {
             $product = $checkout["essence"];
             $message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
@@ -265,7 +199,8 @@ if ($out_data == "checkout") {
             $result["status"] = "error";
             $result["message"][] = "Ошибка обработки счета. Сообщите информацию https://t.me/mufik";
             $result["message"][] = "Также предоставте полное тело запроса и код ".$orderId;
-            echo json_decode($result);
+            $result["invoice"] = $checkout;
+            echo json_encode($result);
             exit;
         }
     } else {
