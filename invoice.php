@@ -1,6 +1,6 @@
 <?php
 
-//CheckOut.php by Mufik v0.1 for Smartsender
+//CheckOut.php Powered by Smart Sender
 
 
 //------------------
