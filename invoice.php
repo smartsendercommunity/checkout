@@ -176,7 +176,7 @@ if ($out_data == "checkout") {
         $checkout = json_decode (send_bearer($api_url."/v1/contacts/".$userid."/invoices/".$orderId, $ss_token), true);
         if ($checkout["essence"] != NULL) {
         	$product = $checkout["essence"];
-		$currency = $essence["currency"];
+		$currency = $product["currency"];
         	$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
     		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
     		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
