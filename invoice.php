@@ -96,6 +96,14 @@ if ($ss_token == NULL || $userid == NULL) {
     exit;
 }
 
+// Курс валют
+$allCurrency = json_decode(file_get_contents("https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json"), true);
+if (is_array($allCurrency)) {
+    foreach ($allCurrency as $oneCurrency) {
+        $currency[$oneCurrency["cc"]] = $oneCurrency["rate"];
+    }
+}
+
 // Получение данных из корзины
 if ($out_data == "checkout") {
     $cursor = json_decode(send_bearer($api_url."/v1/contacts/".$userid."/checkout?page=1&limitation=20", $ss_token), true);
@@ -121,10 +129,15 @@ if ($out_data == "checkout") {
     for ($i = 1; $i <= $pages; $i++) {
         $checkout = json_decode (send_bearer($api_url."/v1/contacts/".$userid."/checkout?page=".$i."&limitation=20", $ss_token), true);
     	$essences = $checkout["collection"];
-    	$currency = $essences[0]["currency"];
+    	$currency_itog = $essences[0]["currency"];
     	foreach ($essences as $product) {
     		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
-    		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
+    		if ($product["cash"]["currency"] == "UAH") {
+    		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
+    		} else {
+    		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"] * $currency[$product["cash"]["currency"]];
+    		}
+    		$summ[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
     		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
     		$bx_tovar["PRODUCT_NAME"] = $product["product"]["name"].': '.$product["name"];
     		$bx_tovar["PRICE"] = $product["amount"];
@@ -176,9 +189,14 @@ if ($out_data == "checkout") {
         $checkout = json_decode (send_bearer($api_url."/v1/contacts/".$userid."/invoices/".$orderId, $ss_token), true);
         if ($checkout["essence"] != NULL) {
         	$product = $checkout["essence"];
-		$currency = $product["currency"];
+		$currency_itog = $product["currency"];
         	$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
-    		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
+        	if ($product["cash"]["currency"] == "UAH") {
+    		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
+    		} else {
+    		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"] * $currency[$product["cash"]["currency"]];
+    		}
+    		$summ[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
     		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
     		$bx_tovar["PRODUCT_NAME"] = $product["product"]["name"].': '.$product["name"];
     		$bx_tovar["PRICE"] = $product["amount"];
@@ -186,9 +204,14 @@ if ($out_data == "checkout") {
     		$bx[] = $bx_tovar;
         } else if ($checkout["essences"] != NULL) {
         	$essences = $checkout["essences"];
-        	$currency = $essences[0]["currency"];
+        	$currency_itog = $essences[0]["currency"];
         	foreach ($essences as $product) {
         		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+        		if ($product["cash"]["currency"] == "UAH") {
+        		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
+        		} else {
+        		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"] * $currency[$product["cash"]["currency"]];
+        		}
         		$summ[] = $product["pivot"]["quantity"]*$product["cash"]["amount"];
         		$tovar[] = $product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' = '.$product["pivot"]["quantity"]*$product["cash"]["amount"];
         		$bx_tovar["PRODUCT_NAME"] = $product["product"]["name"].': '.$product["name"];
@@ -248,7 +271,10 @@ file_put_contents('invoice_count.json', $json_count);
 if (is_array($summ)) {
     $summ_itog = array_sum($summ);
 }
-$text_message = $message.'Общая сумма заказа: '.$summ_itog.' '.$currency.'\n------\n'.$text;
+if (is_array($summUAH)) {
+    $summUAH_itog = array_sum($summUAH);
+}
+$text_message = $message.'Общая сумма заказа: '.$summ_itog.' '.$currency_itog.' ('.$summUAH_itog.' UAH)\n------\n'.$text;
 $to_vars = str_split_unicode($message, 250);
 
 // Отправка уведомления в телеграмм
@@ -434,10 +460,18 @@ if ($bitrix != NULL) {
     send_forward($json_send_deal, $bitrix.'crm.deal.productrows.set.json');
 }
 
+
+
+
 // Возвращение ответа
 $result["count"] = $file_count[$md5];
 $result["summ"] = $summ_itog;
-$result["currency"] = $currency;
+$result["currency"] = $currency_itog;
+$result["amount"]["UAH"] = round($summUAH_itog, 2);
+$result["amount"]["USD"] = round($summUAH_itog / $currency["USD"], 2);
+$result["amount"]["EUR"] = round($summUAH_itog / $currency["EUR"], 2);
+$result["amount"]["GBP"] = round($summUAH_itog / $currency["GBP"], 2);
+$result["amount"]["PLN"] = round($summUAH_itog / $currency["PLN"], 2);
 $result["tovar"] = $tovar;
 $result["to_vars"] = $to_vars;
 echo json_encode($result);
