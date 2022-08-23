@@ -274,7 +274,7 @@ if (is_array($summ)) {
 if (is_array($summUAH)) {
     $summUAH_itog = array_sum($summUAH);
 }
-$text_message = $message.'Общая сумма заказа: '.$summ_itog.' '.$currency_itog.' ('.$summUAH_itog.' UAH)\n------\n'.$text;
+$text_message = $message.'Общая сумма заказа: '.$summ_itog.' '.$currency_itog.' ('.$summUAH_itog.' UAH)'.PHP_EOL.'------'.PHP_EOL.$text;
 $to_vars = str_split_unicode($message, 250);
 
 // Отправка уведомления в телеграмм
@@ -291,7 +291,7 @@ if ($tg_id != NULL) {
         }
         $inline = json_encode($inline_keyboard);
 	$sendTG["chat_id"] = $tg_id;
-	$sendTG["text"] = "Новый заказ: № ".$file_count[$md5]."\n".$text_message;
+	$sendTG["text"] = "Новый заказ: № ".$file_count[$md5].PHP_EOL.$text_message;
 	$sendTG["reply_markup"]["inline_keyboard"] = $inline_keyboard;
         $curl = curl_init();
         curl_setopt_array($curl, array(
@@ -312,7 +312,7 @@ if ($tg_id != NULL) {
         curl_close($curl);
     } else {
 	$sendTG["chat_id"] = $tg_id;
-	$sendTG["text"] = "Новый заказ: № ".$file_count[$md5]."\n".$text_message;
+	$sendTG["text"] = "Новый заказ: № ".$file_count[$md5].PHP_EOL.$text_message;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
@@ -352,7 +352,7 @@ if ($tg_id != NULL) {
 
 if ($result["status"] == "migrate_chat") {
     if (is_array($button)) {
-	$sendTG["text"] = $sendTG["text"]."\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id ".$new_tg_id;
+	$sendTG["text"] = $sendTG["text"].PHP_EOL."------".PHP_EOL."Этот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id ".$new_tg_id;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
@@ -371,7 +371,7 @@ if ($result["status"] == "migrate_chat") {
         $response = curl_exec($curl);
         curl_close($curl);
     } else {
-        $sendTG["text"] = $sendTG["text"]."\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id ".$new_tg_id;
+        $sendTG["text"] = $sendTG["text"].PHP_EOL."------".PHP_EOL."Этот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id ".$new_tg_id;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
