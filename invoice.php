@@ -131,7 +131,7 @@ if ($out_data == "checkout") {
     	$essences = $checkout["collection"];
     	$currency_itog = $essences[0]["currency"];
     	foreach ($essences as $product) {
-    		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+    		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].PHP_EOL;
     		if ($product["cash"]["currency"] == "UAH") {
     		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
     		} else {
@@ -190,7 +190,7 @@ if ($out_data == "checkout") {
         if ($checkout["essence"] != NULL) {
         	$product = $checkout["essence"];
 		$currency_itog = $product["currency"];
-        	$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+        	$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].PHP_EOL;
         	if ($product["cash"]["currency"] == "UAH") {
     		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
     		} else {
@@ -206,7 +206,7 @@ if ($out_data == "checkout") {
         	$essences = $checkout["essences"];
         	$currency_itog = $essences[0]["currency"];
         	foreach ($essences as $product) {
-        		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].' \n';
+        		$message = $message.$product["product"]["name"].': '.$product["name"].' - '.$product["pivot"]["quantity"].' x '.$product["amount"].PHP_EOL;
         		if ($product["cash"]["currency"] == "UAH") {
         		    $summUAH[] = $product["pivot"]["quantity"] * $product["cash"]["amount"];
         		} else {
