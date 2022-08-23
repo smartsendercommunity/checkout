@@ -290,7 +290,9 @@ if ($tg_id != NULL) {
             $inline_keyboard[][0] = $inline_key;
         }
         $inline = json_encode($inline_keyboard);
-
+	$sendTG["chat_id"] = $tg_id;
+	$sendTG["text"] = "Новый заказ: № ".$file_count[$md5]."\n".$text_message;
+	$sendTG["reply_markup"]["inline_keyboard"] = $inline_keyboard;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
@@ -301,13 +303,7 @@ if ($tg_id != NULL) {
           CURLOPT_FOLLOWLOCATION => true,
           CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
           CURLOPT_CUSTOMREQUEST => 'POST',
-          CURLOPT_POSTFIELDS =>'{
-            "chat_id":"'.$tg_id.'",
-            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'",
-            "reply_markup":{
-                "inline_keyboard": '.$inline.'
-            }
-        }',
+          CURLOPT_POSTFIELDS => json_encode($sendTG),
           CURLOPT_HTTPHEADER => array(
             'Content-Type: application/json'
           ),
@@ -315,6 +311,8 @@ if ($tg_id != NULL) {
         $response = curl_exec($curl);
         curl_close($curl);
     } else {
+	$sendTG["chat_id"] = $tg_id;
+	$sendTG["text"] = "Новый заказ: № ".$file_count[$md5]."\n".$text_message;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
@@ -325,10 +323,7 @@ if ($tg_id != NULL) {
           CURLOPT_FOLLOWLOCATION => true,
           CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
           CURLOPT_CUSTOMREQUEST => 'POST',
-          CURLOPT_POSTFIELDS =>'{
-            "chat_id":"'.$tg_id.'",
-            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'",
-        }',
+          CURLOPT_POSTFIELDS => json_encode($sendTG),
           CURLOPT_HTTPHEADER => array(
             'Content-Type: application/json'
           ),
@@ -357,6 +352,7 @@ if ($tg_id != NULL) {
 
 if ($result["status"] == "migrate_chat") {
     if (is_array($button)) {
+	$sendTG["text"] = $sendTG["text"]."\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id ".$new_tg_id;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
@@ -367,13 +363,7 @@ if ($result["status"] == "migrate_chat") {
           CURLOPT_FOLLOWLOCATION => true,
           CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
           CURLOPT_CUSTOMREQUEST => 'POST',
-          CURLOPT_POSTFIELDS =>'{
-            "chat_id":"'.$new_tg_id.'",
-            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id '.$new_tg_id.'",
-            "reply_markup":{
-                "inline_keyboard": '.$inline.'
-            }
-        }',
+          CURLOPT_POSTFIELDS => json_encode($sendTG),
           CURLOPT_HTTPHEADER => array(
             'Content-Type: application/json'
           ),
@@ -381,6 +371,7 @@ if ($result["status"] == "migrate_chat") {
         $response = curl_exec($curl);
         curl_close($curl);
     } else {
+        $sendTG["text"] = $sendTG["text"]."\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id ".$new_tg_id;
         $curl = curl_init();
         curl_setopt_array($curl, array(
           CURLOPT_URL => 'https://api.telegram.org/bot'.$tg_token.'/sendMessage',
@@ -391,10 +382,7 @@ if ($result["status"] == "migrate_chat") {
           CURLOPT_FOLLOWLOCATION => true,
           CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
           CURLOPT_CUSTOMREQUEST => 'POST',
-          CURLOPT_POSTFIELDS =>'{
-            "chat_id":"'.$new_tg_id.'",
-            "text":"Новый заказ: № '.$file_count[$md5].'\n'.$text_message.'\n------\nЭтот чат превратился в супергруппу. Пожалуйста замените Id чата в запросах. Новый chat_id '.$new_tg_id.'",
-        }',
+          CURLOPT_POSTFIELDS => json_encode($sendTG),
           CURLOPT_HTTPHEADER => array(
             'Content-Type: application/json'
           ),
