@@ -18,6 +18,20 @@ http_response_code(200);
 //------------------
 
 $inputJSON = file_get_contents('php://input');
+
+// Подмена переменных
+$userId = $_GET["userId"];
+$ssToken = $_GET["token"];
+$getUser = json_decode(send_bearer("https://api.smartsender.com/v1/contacts/".$userId."/info", $ssToken), true);
+if ($getUser != NULL && is_array($getUser)) {
+    foreach ($getUser as $key => $value) {
+        $search[] = "{{".$key."}}";
+        $replace[] = substr(json_encode($value, JSON_UNESCAPED_UNICODE),1,-1);
+    }
+}
+$inputJSON = str_ireplace($search, $replace, $inputJSON);
+
+
 $input = json_decode($inputJSON, TRUE); //convert JSON into array
 
 //------------------
