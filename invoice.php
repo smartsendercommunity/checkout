@@ -31,7 +31,6 @@ if ($getUser != NULL && is_array($getUser)) {
 }
 $inputJSON = str_ireplace($search, $replace, $inputJSON);
 
-
 $input = json_decode($inputJSON, TRUE); //convert JSON into array
 
 //------------------
@@ -110,6 +109,7 @@ if ($ss_token == NULL || $userid == NULL) {
     exit;
 }
 
+/*
 // Курс валют
 $allCurrency = json_decode(file_get_contents("https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json"), true);
 if (is_array($allCurrency)) {
@@ -117,6 +117,7 @@ if (is_array($allCurrency)) {
         $currency[$oneCurrency["cc"]] = $oneCurrency["rate"];
     }
 }
+*/
 
 // Получение данных из корзины
 if ($out_data == "checkout") {
@@ -469,11 +470,13 @@ if ($bitrix != NULL) {
 $result["count"] = $file_count[$md5];
 $result["summ"] = $summ_itog;
 $result["currency"] = $currency_itog;
+/*
 $result["amount"]["UAH"] = round($summUAH_itog, 2);
 $result["amount"]["USD"] = round($summUAH_itog / $currency["USD"], 2);
 $result["amount"]["EUR"] = round($summUAH_itog / $currency["EUR"], 2);
 $result["amount"]["GBP"] = round($summUAH_itog / $currency["GBP"], 2);
 $result["amount"]["PLN"] = round($summUAH_itog / $currency["PLN"], 2);
+*/
 $result["tovar"] = $tovar;
 $result["to_vars"] = $to_vars;
 echo json_encode($result);
