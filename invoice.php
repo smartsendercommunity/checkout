@@ -8,6 +8,8 @@
 ini_set('max_execution_time', '1700');
 set_time_limit(1700);
 
+ini_set('display_errors', '1');
+error_reporting(E_ERROR);
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST');
